@@ -1,34 +1,36 @@
-from os import path
+import os
 
-# This script is one-time only
+# Removes all symbols that don't point to a file name
 
-if path.exists("No longer needed files/symbols.txt"):
-    print("Filtered symbol file already exists!")
+name = "symbols/symbols.txt"
+tmp_name = "symbols/symbols_tmp_name.txt"
+if os.path.exists(tmp_name):
+    print("Error: temporary file already exists!")
     exit(1)
 
-symbols_file = open("No longer needed files/symbols.txt", "r")
+os.rename(name, tmp_name)
+symbols_file = open(tmp_name, "r")
 lines = symbols_file.readlines()
 symbols_file.close()
 
 print("Creating symbols array")
-
 symbols = []
 for line in lines:
     no_newline = line.rstrip('\n')
     symbols.append(no_newline)
 
 print("Sorting symbols")
-
 symbols.sort()
 
 print("Creating the filtered symbols file")
-
-filtered_symbols_file = open("No longer needed files/symbols.txt", "a")
+filtered_symbols_file = open(name, "a")
 for symbol in symbols:
-    file_name = "company_data_unfiltered/" + symbol + ".csv"
-    if path.exists(file_name):
+    file_name = "company_data/" + symbol + ".csv"
+    if os.path.exists(file_name):
         filtered_symbols_file.write(symbol + "\n")
 filtered_symbols_file.close()
+
+os.remove(tmp_name)
 
 
 """

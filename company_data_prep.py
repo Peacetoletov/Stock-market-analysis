@@ -1,9 +1,8 @@
 import yfinance as yf
+import os
 
-# This script is one-time only
 
-
-symbols_file = open("No longer needed files/unfiltered_symbols.txt", "r")
+symbols_file = open("symbols/s&p500.txt", "r")
 lines = symbols_file.readlines()
 symbols_file.close()
 
@@ -12,27 +11,29 @@ for line in lines:
     no_newline = line.rstrip('\n')
     symbols.append(no_newline)
 
-# print(symbols[0:20])
-# stock_set = symbols[0:20]
-stock_set = symbols
 
-# 105727 symbols in total
-# print(len(stock_set))
+# Unfiltered_symbols stáhnuto: 105727 (max)
+# more_symbols stáhnuto: 5389 (max)
 
-# All downloadable files are downloaded - over 49 600 files
+for i in range(0, 510):
+    file_name = "company_data/" + symbols[i] + ".csv"
+    if os.path.exists(file_name):
+        print("i =", i, "(file exists already)")
+        continue
 
-for i in range(23000, 25000):
     print("i =", i)
 
-    file_name = "company_data_unfiltered/" + stock_set[i] + ".csv"
-    data = yf.download(
-        tickers=stock_set[i],
-        period="max",
-        interval="3mo",
-        group_by='column',
-        auto_adjust=True,
-    )
-    # ^ What the arguments mean: https://pypi.org/project/yfinance/
+    try:
+        data = yf.download(
+            tickers=symbols[i],
+            period="max",
+            interval="3mo",
+            # Auto adjust must be False! (default)
+        )
+        # ^ What the arguments mean: https://pypi.org/project/yfinance/
 
-    if len(data.index) > 2:
-        data.to_csv(file_name)
+        if len(data.index) > 2:
+            data.to_csv(file_name)
+    except Exception:
+        print("Hah caught one")
+        continue
