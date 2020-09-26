@@ -31,17 +31,17 @@ def filter_lines(tmp_name, name):
     os.remove(tmp_name)
 
 
-def download(symbols, time_frame):
-    if time_frame == "weekly":
+def download(symbols, frequency):
+    if frequency == "weekly":
         _interval = "1wk"
-    elif time_frame == "monthly":
+    elif frequency == "monthly":
         _interval = "1mo"
     else:
-        print("Unrecognized time frame!")
+        print("Unrecognized frequency!")
         return
 
     for i in range(len(symbols)):
-        file_name = "prices/" + time_frame + "/" + symbols[i] + ".csv"
+        file_name = "prices/" + frequency + "/" + symbols[i] + ".csv"
         if os.path.exists(file_name):
             print("i =", i, "(file exists already)")
             continue
@@ -56,7 +56,7 @@ def download(symbols, time_frame):
             )
             data = data.filter(["Date", "Open", "Close"])
 
-            file_name_tmp = "prices/" + time_frame + "/" + symbols[i] + \
+            file_name_tmp = "prices/" + frequency + "/" + symbols[i] + \
                             "_tmp.csv"
             data.to_csv(file_name_tmp)
             filter_lines(file_name_tmp, file_name)
@@ -68,10 +68,10 @@ def download(symbols, time_frame):
 
 def main():
     symbols = get_symbols()
-    symbols = ["SPY"]
+    symbols = ["GLD"]
 
-    time_frame = "weekly"
-    download(symbols, time_frame)
+    frequency = "weekly"
+    download(symbols, frequency)
 
 
 main()

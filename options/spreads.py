@@ -1,4 +1,19 @@
 from random import random
+from os import listdir
+from math import floor
+
+
+class Spread:
+
+    def __init__(self, price, strike1, premium1, strike2, premium2):
+        # Selling option1, buying option2
+        self.price = price
+        self.strike1 = strike1
+        self.premium1 = premium1
+        self.strike2 = strike2
+        self.premium2 = premium2
+        self.type = "put" if strike1 > strike2 else "call"
+
 
 def get_symbols():
     symbols_file = open("s&p500.txt", "r")
@@ -13,11 +28,11 @@ def get_symbols():
     return symbols
 
 
-def get_prices(symbol, year_start=None, year_end=None):
-    symbols_file = open("prices/monthly" + symbol + ".csv", "r")
-    symbols_file.readline()
-    lines = symbols_file.readlines()
-    symbols_file.close()
+def get_prices(file, year_start=None, year_end=None):
+    price_file = open(file, "r")
+    price_file.readline()
+    lines = price_file.readlines()
+    price_file.close()
 
     prices = []
     for line in lines:
@@ -33,14 +48,18 @@ def get_color(price, prev_price):
     return "green" if price >= prev_price else "red"
 
 
-def analyze_binary_change():
-    symbols = get_symbols()
+def analyze_binary_change_monthly():
+    # This hypothesis states that if a given month is green, the next month
+    # is likely to be green as well. In other words, the likelihood of a
+    # green month is higher if the previous month was also green.
+    # This hypothesis was disproved.
+    price_files = listdir("prices/monthly")
     green_to_green = 0
     green_to_red = 0
     red_to_green = 0
     red_to_red = 0
-    for symbol in symbols:
-        prices = get_prices(symbol)
+    for file in price_files:
+        prices = get_prices("prices/monthly/" + file)
 
         prev_price = None
         prev_color = None
@@ -86,12 +105,85 @@ def analyze_binary_change():
     print("red -> red ", red_chance_if_prev_red)
 
 
-def analyze_change():
-    symbols = get_symbols()
+def analyze_binary_change_weekly():
+    """
+    If 2 weeks are green, will the next week be likely green too?
+
+    No.
+    """
+    price_files = listdir("prices/weekly")
+    print(price_files)
+
+    # How many green and red weeks there are in total
+    total_green = 0
+    total_red = 0
+
+    # How many green and red weeks there are after 2 green weeks
+    hypothesis_green = 0
+    hypothesis_red = 0
+
+    for file in price_files:
+        prices = get_prices("prices/weekly/" + file)
+        if len(prices) < 4:
+            continue
+
+        for i in range(2, len(prices) - 1):
+            prev_prev_price = prices[i - 2]
+            prev_price = prices[i - 1]
+            cur_price = prices[i]
+            next_price = prices[i + 1]
+
+            week1 = get_color(prev_price, prev_prev_price)
+            week2 = get_color(cur_price, prev_price)
+            week3 = get_color(next_price, cur_price)
+            if week1 == "green" and week2 == "green":
+                if week3 == "green":
+                    hypothesis_green += 1
+                else:
+                    hypothesis_red += 1
+
+            if week3 == "green":
+                total_green += 1
+            else:
+                total_red += 1
+
+    print("Hypothesis green:", hypothesis_green)
+    print("Hypothesis red:", hypothesis_red)
+    print("Hypothesis win rate:", hypothesis_green / (hypothesis_green + hypothesis_red))
+    print("Total green:", total_green)
+    print("Total red:", total_red)
+    print("Total win rate:", total_green / (total_green + total_red))
+
+
+def print_percentiles(arr1, arr1name, arr2, arr2name, fractions=100):
+    arr1.sort()
+    arr2.sort()
+
+    for i in range(0, fractions):
+        fraction_size_arr1 = len(arr1) / fractions
+        fraction_size_arr2 = len(arr2) / fractions
+
+        percentile = round(10000 * i / fractions) / 100
+
+        arr1value = round(10000 * arr1[floor(i * fraction_size_arr1)]) / 100
+        arr2value = round(10000 * arr2[floor(i * fraction_size_arr2)]) / 100
+        print("Top", percentile, "percentile.",  arr1name + ":", arr1value,
+              arr2name + ":", arr2value)
+
+    print("Top 100.0 percentile.",  arr1name + ":",
+          round(10000 * arr1[-1]) / 100, arr2name + ":",
+          round(10000 * arr2[-1]) / 100)
+
+    print(arr1name, "sample size:", len(arr1))
+    print(arr2name, "sample size:", len(arr2))
+
+
+def analyze_change_monthly():
+    price_files = listdir("prices/monthly")
     change_after_green = []
     change_after_red = []
-    for symbol in symbols:
-        prices = get_prices(symbol)
+    for file in price_files:
+        prices = get_prices("prices/monthly/" + file)
 
         prev_price = None
         prev_color = None
@@ -117,96 +209,124 @@ def analyze_change():
             prev_price = price
             prev_color = color
 
-    change_after_green.sort()
-    change_after_red.sort()
-
-    fractions = 99
-    for i in range(1, fractions + 1):
-        fraction_size_green = len(change_after_green) / (fractions + 1)
-        fraction_size_red = len(change_after_red) / (fractions + 1)
-
-        percentile = round(10000 * i / (fractions + 1)) / 100
-        price_after_green = round(10000 * change_after_green[round(i * fraction_size_green)]) / 100
-        price_after_red = round(10000 * change_after_red[round(i * fraction_size_red)]) / 100
-        print("Top", percentile, "percentile. After green:", price_after_green,
-              "After red:", price_after_red)
-
-    print("green sample size:", len(change_after_green))
-    print("red sample size:", len(change_after_red))
+    print_percentiles(change_after_green, "Green", change_after_red, "Red")
 
 
-def evaluate_spread(price_change, upper, lower, max_gain, max_loss):
+def analyze_change_weekly():
+    price_files = listdir("prices/weekly")
+    price_files = ["SPY.csv"]
+
+    change_random = []
+    change_hypothesis = []
+    for file in price_files:
+        print(file)
+
+        prices = get_prices("prices/weekly/" + file)
+        if len(prices) < 4:
+            continue
+
+        for i in range(2, len(prices) - 1):
+            prev_prev_price = prices[i - 2]
+            prev_price = prices[i - 1]
+            cur_price = prices[i]
+            next_price = prices[i + 1]
+
+            change = next_price / cur_price
+
+            week1 = get_color(prev_price, prev_prev_price)
+            week2 = get_color(cur_price, prev_price)
+            if week1 == "green" and week2 == "green":
+                change_hypothesis.append(change)
+
+            change_random.append(change)
+            # print("change =", change, "cur =", cur_price, "next =",
+            # next_price)
+
+    print_percentiles(change_random, "Random", change_hypothesis,
+                      "Hypothesis")
+
+
+def evaluate_spread(price_change, spread: Spread):
+    upper = spread.strike1 / spread.price
+    lower = spread.strike2 / spread.price
+    max_gain = (spread.premium1 - spread.premium2) * 100
+    max_loss = (spread.strike2 - spread.strike1) * 100 + max_gain
+
+    print("Price change =", price_change, end="; ")
+
     if price_change >= upper:
-        return max_gain
+        print("Max gain.", max_gain)
+        return max_gain, "max_gain"
     if price_change <= lower:
-        return max_loss
+        print("Max loss.", max_loss)
+        return max_loss, "max_loss"
 
     interval_length = upper - lower
     from_lower = price_change - lower
     ratio = from_lower / interval_length
     gain_loss_interval = max_gain - max_loss
     spread_value = max_loss + ratio * gain_loss_interval
-    return spread_value
+    print("Middle.", spread_value)
+    return spread_value, "middle"
 
 
-def backtest_spread_strategy(upper, lower, max_gain, max_loss,
-                             required_color="green"):
-    symbols = get_symbols()
+def is_sublist_ascending(arr, lowest_index, length):
+    for i in range(lowest_index, length):
+        if arr[i] > arr[i + 1]:
+            return False
+    return True
+
+
+def backtest_spread_strategy(file, spread: Spread, green_weeks_required=0):
+    # TODO: use green_weeks_required to simulate using a strategy
     total_gain = 0
     sample_size = 0
+    skipped = 0
 
     full_gains = 0
     full_losses = 0
     middles = 0
     total_middle = 0
 
-    for symbol in symbols:
-        prices = get_prices(symbol)
-        # prices = get_prices(symbol, year_start=2010)
-        # prices = get_prices(symbol, year_start=2005, year_end=2015)
+    prices = get_prices(file, 1991, 2020)
+    for i in range(green_weeks_required, len(prices) - 1):
+        # Ignore the current week if there aren't enough green weeks before
+        # (as specified by green_weeks_required, with 0 being no condition
+        # at all)
+        if not is_sublist_ascending(prices, i - green_weeks_required, i):
+            skipped += 1
+            continue
 
-        prev_price = None
-        prev_color = None
-        for price in prices:
-            # first iteration
-            if prev_price is None:
-                prev_price = price
-                continue
-            # second iteration
-            if prev_color is None:
-                prev_color = get_color(price, prev_price)
-                prev_price = price
-                continue
+        price_change = prices[i + 1] / prices[i]
+        spread_value, result = evaluate_spread(price_change, spread)
+        # print("prev_price =", prices[i - 1], "cur_price =", prices[i],
+        #       "price change =", round(100 * price_change) / 100)
+        total_gain += spread_value
+        sample_size += 1
 
-            # other iterations
-            color = get_color(price, prev_price)
-            price_change = price / prev_price
-            if prev_color == required_color:
-                spread_value = evaluate_spread(price_change, upper, lower,
-                                               max_gain, max_loss)
-                # print("prev price =", round(100 * prev_price) / 100,
-                #       "value =", spread_value)
-                total_gain += spread_value
-                sample_size += 1
+        if result == "max_gain":
+            full_gains += 1
+        elif result == "max_loss":
+            full_losses += 1
+        else:
+            middles += 1
+            total_middle += spread_value
 
-                if spread_value == max_gain:
-                    full_gains += 1
-                elif spread_value == max_loss:
-                    full_losses += 1
-                else:
-                    middles += 1
-                    total_middle += spread_value
+    average_middle = None if middles == 0 else total_middle / middles
+    ev = total_gain / sample_size
+    collateral = (spread.strike1 - spread.strike2) * 100
+    yearly_ev = 52 * ev * sample_size / (sample_size + skipped)
 
-            prev_price = price
-            prev_color = color
-
-    print("total gain =", total_gain, "sample_size =", sample_size, "EV =",
-          total_gain / sample_size)
+    print("total gain =", total_gain, "sample_size =", sample_size,
+          "skipped:", skipped, "EV =", ev)
     print("Wins =", full_gains, "Losses =", full_losses, "Middles =",
-          middles, "Average middle =", total_middle / middles)
+          middles, "Average middle =", average_middle)
+    print("yearly_EV =", yearly_ev, "Yearly return:",
+          round(yearly_ev / collateral * 10000) / 100, "%")
 
 
 def simulate_trading(starting_capital, max_risk=0.5):
+    # TODO: needs major changes
     # win_chance = 80.53
     win_value = 100
     loss_chance = 12.13
@@ -246,11 +366,18 @@ def simulate_trading(starting_capital, max_risk=0.5):
 
 
 def main():
-    # analyze_binary_change()
-    # analyze_change()
-    # backtest_spread_strategy(0.95, 0.925, 100, -400)
-    backtest_spread_strategy(0.927, 0.618, 272, -9728, "green")
-    # simulate_trading(5000)
+    analyze_change_weekly()
+
+    file_spy = "prices/weekly/SPY.csv"
+    file_amd = "prices/weekly/AMD.csv"
+    spread1 = Spread(175.20, 175, 1.53, 165, 0.10)
+    spread2 = Spread(175.20, 167.5, 0.15, 140, 0.01)
+    spread3 = Spread(174.87, 174, 1.24, 169, 0.29)
+    spread4 = Spread(174.87, 172.5, 0.79, 162.50, 0.07)
+    spread_amd = Spread(78.06, 78, 2.01, 72, 0.35)
+
+    spread_test = Spread(174.87, 200, 1.2, 220, 0.35)
+    #backtest_spread_strategy(file_amd, spread_amd, 2)
 
 
 main()

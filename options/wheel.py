@@ -24,24 +24,12 @@ hold a mírně nižší EV než wheel. Wheel má ale pořád podstatně nižší
 buy and hold.
 """
 
-# TODO: otestovat následující strategii: 1týdenní candle. Jakmile 2 po sobě
-#  budou zelené, prodávám ATM cash secured put. Pokud je následující týden
-#  zelený, opakuji postup. Pokud je následující týden červený (tzn. musím
-#  koupit 100 akcií) (ve skutečnosti budu prodávat malinko OTM put,
-#  takže se musím dívat na to, jestli jsem dostal akcie, ne na to, zda je
-#  týden červený. Pro jednoduchost ale tento stav beru shodný s červeným
-#  týdnem), potom si akcie nějakou dobu nechávám. V moment, kdy jsou 2 týdny
-#  po sobě zelené, prodávám své akcie a celý postup opakuji (začnu prodáním
-#  putu...).
-
-import yfinance as yf
-
 
 def get_prices(symbol=None, year_start=None, year_end=None):
     if symbol is None:
-        symbols_file = open("wheel_prices/spy.csv", "r")
+        symbols_file = open("prices/weekly/spy.csv", "r")
     else:
-        symbols_file = open("wheel_prices/" + symbol + ".csv", "r")
+        symbols_file = open("prices/weekly/" + symbol + ".csv", "r")
     symbols_file.readline()
     lines = symbols_file.readlines()
     symbols_file.close()
@@ -228,9 +216,18 @@ def simulate_custom_strategy(symbol=None):
     put_strike = 270 / reference_price
     put_premium = 2.35 / reference_price
     """
-    reference_price = 326.97
-    put_strike = 326 / reference_price
-    put_premium = 3.66 / reference_price
+
+    """
+    # GLD 15. 9. 2020 17.14% IV
+    reference_price = 175.09
+    put_strike = 175 / reference_price
+    put_premium = 1.7 / reference_price
+    """
+
+    # SPY 30. 3. 2017 7.58% IV (extremely low IV)
+    reference_price = 236.29
+    put_strike = 236 / reference_price
+    put_premium = 0.95 / reference_price
 
     capital = 0
     holding_shares = True
@@ -266,10 +263,10 @@ def simulate_custom_strategy(symbol=None):
 
 
 def main():
-    simulate_wheel()
+    #simulate_wheel()
     #simulate_covered_calls("APA")
     #simulate_naked_puts("APA")
-    #simulate_custom_strategy()
+    simulate_custom_strategy()
 
 
 main()
