@@ -140,11 +140,19 @@ def simulate_wheel(symbol=None):
 
 
 def simulate_covered_calls(symbol=None):
-    prices = get_prices(symbol, 2000, 2011)
+    prices = get_prices(symbol)
 
-    reference_price = 270.01
-    call_strike = 270 / reference_price
-    call_premium = 2.1 / reference_price
+    #"""
+    reference_price = 174.94
+    call_strike = 178 / reference_price
+    call_premium = 0.45 / reference_price
+    #"""
+
+    """
+    reference_price = 174.94
+    call_strike = 175 / reference_price
+    call_premium = 1.71 / reference_price
+    """
 
     capital = 0
     holding_shares = True
@@ -159,6 +167,10 @@ def simulate_covered_calls(symbol=None):
             capital -= 100 * next_price
             holding_shares = True
             print("Need to buy shares back. New capital:", capital)
+
+    if holding_shares:
+        capital += 100 * prices[-1]
+        holding_shares = False
 
     alternative_capital = 100 * prices[-1]
 
@@ -199,7 +211,7 @@ def simulate_naked_puts(symbol=None):
 
 
 def simulate_custom_strategy(symbol=None):
-    prices = get_prices(symbol)
+    prices = get_prices(symbol, 2013, 2019)
     if len(prices) < 3:
         print("Price list too small!")
         return
@@ -228,6 +240,11 @@ def simulate_custom_strategy(symbol=None):
     reference_price = 236.29
     put_strike = 236 / reference_price
     put_premium = 0.95 / reference_price
+
+    # test
+    reference_price = 236.29
+    put_strike = 236 / reference_price
+    put_premium = 1.37 / reference_price
 
     capital = 0
     holding_shares = True
@@ -264,7 +281,7 @@ def simulate_custom_strategy(symbol=None):
 
 def main():
     #simulate_wheel()
-    #simulate_covered_calls("APA")
+    #simulate_covered_calls("SPY")
     #simulate_naked_puts("APA")
     simulate_custom_strategy()
 

@@ -68,7 +68,7 @@ def download(symbols, frequency):
 
 def main():
     symbols = get_symbols()
-    symbols = ["GLD"]
+    symbols = ["FAS"]
 
     frequency = "weekly"
     download(symbols, frequency)

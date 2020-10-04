@@ -214,7 +214,7 @@ def analyze_change_monthly():
 
 def analyze_change_weekly():
     price_files = listdir("prices/weekly")
-    price_files = ["SPY.csv"]
+    # price_files = ["SPY.csv"]
 
     change_random = []
     change_hypothesis = []
@@ -246,27 +246,43 @@ def analyze_change_weekly():
                       "Hypothesis")
 
 
+def is_fully_otm(price_change, closer, option_type):
+    if option_type == "put" and price_change >= closer:
+        return True
+    if option_type == "call" and price_change <= closer:
+        return True
+    return False
+
+
+def is_fully_itm(price_change, further, option_type):
+    if option_type == "put" and price_change <= further:
+        return True
+    if option_type == "call" and price_change >= further:
+        return True
+    return False
+
+
 def evaluate_spread(price_change, spread: Spread):
-    upper = spread.strike1 / spread.price
-    lower = spread.strike2 / spread.price
+    closer = spread.strike1 / spread.price
+    further = spread.strike2 / spread.price
     max_gain = (spread.premium1 - spread.premium2) * 100
-    max_loss = (spread.strike2 - spread.strike1) * 100 + max_gain
+    max_loss = abs(spread.strike1 - spread.strike2) * -100 + max_gain
 
-    print("Price change =", price_change, end="; ")
+    print("Price change =", round(price_change * 1000) / 1000, end="; ")
 
-    if price_change >= upper:
-        print("Max gain.", max_gain)
+    if is_fully_otm(price_change, closer, spread.type):
+        print("Max gain.", round(max_gain * 1000) / 1000)
         return max_gain, "max_gain"
-    if price_change <= lower:
-        print("Max loss.", max_loss)
+    if is_fully_itm(price_change, further, spread.type):
+        print("Max loss.", round(max_loss * 1000) / 1000)
         return max_loss, "max_loss"
 
-    interval_length = upper - lower
-    from_lower = price_change - lower
-    ratio = from_lower / interval_length
+    interval_length = abs(closer - further)
+    from_further = abs(price_change - further)
+    ratio = from_further / interval_length
     gain_loss_interval = max_gain - max_loss
     spread_value = max_loss + ratio * gain_loss_interval
-    print("Middle.", spread_value)
+    print("Middle.", round(spread_value * 1000) / 1000)
     return spread_value, "middle"
 
 
@@ -278,7 +294,6 @@ def is_sublist_ascending(arr, lowest_index, length):
 
 
 def backtest_spread_strategy(file, spread: Spread, green_weeks_required=0):
-    # TODO: use green_weeks_required to simulate using a strategy
     total_gain = 0
     sample_size = 0
     skipped = 0
@@ -314,7 +329,9 @@ def backtest_spread_strategy(file, spread: Spread, green_weeks_required=0):
 
     average_middle = None if middles == 0 else total_middle / middles
     ev = total_gain / sample_size
-    collateral = (spread.strike1 - spread.strike2) * 100
+    collateral = 100 * (abs(spread.strike1 - spread.strike2) -
+                        spread.premium1 + spread.premium2)
+    print("Collateral =", collateral)
     yearly_ev = 52 * ev * sample_size / (sample_size + skipped)
 
     print("total gain =", total_gain, "sample_size =", sample_size,
@@ -323,6 +340,68 @@ def backtest_spread_strategy(file, spread: Spread, green_weeks_required=0):
           middles, "Average middle =", average_middle)
     print("yearly_EV =", yearly_ev, "Yearly return:",
           round(yearly_ev / collateral * 10000) / 100, "%")
+
+
+def backtest_condor(file, put_spread: Spread,
+                    call_spread: Spread, green_weeks_required=0):
+    total_gain = 0
+    sample_size = 0
+    skipped = 0
+
+    full_losses = 0
+    partial_losses = 0
+    gains = 0
+
+    loss_sum = 0
+    gain_sum = 0
+
+    # prices = get_prices(file, 2013, 2019)   # low SPY volatlity (approx 14%)
+    prices = get_prices(file, 2013, 2019)
+    for i in range(green_weeks_required, len(prices) - 1):
+        # Ignore the current week if there aren't enough green weeks before
+        # (as specified by green_weeks_required, with 0 being no condition
+        # at all)
+        if not is_sublist_ascending(prices, i - green_weeks_required, i):
+            skipped += 1
+            continue
+
+        print("current price:", prices[i])
+
+        price_change = prices[i + 1] / prices[i]
+        put_spread_value, put_result = evaluate_spread(price_change, put_spread)
+        call_spread_value, call_result = evaluate_spread(price_change, call_spread)
+
+        value = put_spread_value + call_spread_value
+        total_gain += value
+        sample_size += 1
+
+        if put_result == "max_loss" or call_result == "max_loss":
+            print("Max loss.", round(value * 1000) / 1000)
+            loss_sum += value
+            full_losses += 1
+        elif value < 0:
+            print("Partial loss.", round(value * 1000) / 1000)
+            loss_sum += value
+            partial_losses += 1
+        else:
+            print("Gain.", round(value * 1000) / 1000)
+            gain_sum += value
+            gains += 1
+
+    losses = full_losses + partial_losses
+    average_gain = None if gains == 0 else gain_sum / gains
+    average_loss = None if losses == 0 else loss_sum / losses
+    ev = total_gain / sample_size
+    # collateral = (spread.strike1 - spread.strike2) * 100
+    # yearly_ev = 52 * ev * sample_size / (sample_size + skipped)
+
+    print("total gain =", total_gain, "sample_size =", sample_size,
+          "skipped:", skipped, "EV =", ev)
+    print("Wins =", gains, "Full losses =", full_losses, "Partial losses =",
+          partial_losses, "Average gain =", average_gain, "Average loss =",
+          average_loss)
+    #print("yearly_EV =", yearly_ev, "Yearly return:",
+    #    round(yearly_ev / collateral * 10000) / 100, "%")
 
 
 def simulate_trading(starting_capital, max_risk=0.5):
@@ -365,19 +444,70 @@ def simulate_trading(starting_capital, max_risk=0.5):
         print("Top", percentile, "percentile. Money:", money)
 
 
-def main():
-    analyze_change_weekly()
-
+def random_numbers():
     file_spy = "prices/weekly/SPY.csv"
     file_amd = "prices/weekly/AMD.csv"
+    file_gld = "prices/weekly/GLD.csv"
+    file_adm = "prices/weekly/ADM.csv"
+    file_cl = "prices/weekly/CL.csv"
+    file_abbv = "prices/weekly/ABBV.csv"
     spread1 = Spread(175.20, 175, 1.53, 165, 0.10)
     spread2 = Spread(175.20, 167.5, 0.15, 140, 0.01)
     spread3 = Spread(174.87, 174, 1.24, 169, 0.29)
     spread4 = Spread(174.87, 172.5, 0.79, 162.50, 0.07)
     spread_amd = Spread(78.06, 78, 2.01, 72, 0.35)
+    # backtest_spread_strategy(file_spy, spread3, 1)
 
-    spread_test = Spread(174.87, 200, 1.2, 220, 0.35)
-    #backtest_spread_strategy(file_amd, spread_amd, 2)
+    # GLD, cca 18.5% IV (nadprůměr)
+    condor_put1 = Spread(174.94, 174, 1.34, 169, 0.33)
+    condor_call1 = Spread(174.94, 176, 1.27, 181, 0.26)
+
+    # AMD, cca 48% IV (podprůměr)
+    condor_put2 = Spread(78.05, 78, 2.01, 73, 0.48)
+    condor_call2 = Spread(78.05, 78.5, 1.81, 83.5, 0.51)
+
+    condor_put2_2 = Spread(78.05, 78, 2.01, 68, 0.12)
+    condor_call2_2 = Spread(78.05, 78.5, 1.81, 88.5, 0.09)
+
+    # SPY, cca 8% IV (velký podprůměr)
+    condor_put3 = Spread(236.29, 236, 0.91, 231, 0.16)
+    condor_call3 = Spread(236.29, 237, 0.75, 242, 0.04)
+
+    # Další GLD
+    condor_put4 = Spread(174.94, 174, 1.34, 160, 0.06)
+    condor_call4 = Spread(174.94, 176, 1.27, 190, 0.04)
+
+    # ADM
+    condor_put5 = Spread(46.08, 46, 0.59, 41, 0.06)
+    condor_call5 = Spread(46.08, 46.5, 0.42, 51.5, 0.06)
+
+    # CL
+    condor_put6 = Spread(75.95, 75.50, 0.6, 70, 0.04)
+    condor_call6 = Spread(75.95, 76.50, 0.54, 82, 0.05)
+
+    # ABBV
+    condor_put7 = Spread(86.23, 86, 1.03, 80, 0.19)
+    condor_call7 = Spread(86.23, 87, 0.75, 93, 0.04)
+
+    # GLD, cca 18.5% IV (nadprůměr), více otm
+    condor_put8 = Spread(174.94, 172.5, 0.86, 162.5, 0.09)
+    condor_call8 = Spread(174.94, 178, 0.65, 188, 0.06)
+
+    backtest_condor(file_spy, condor_put1, condor_call1, 2)
+
+
+def main():
+    # analyze_change_weekly()
+    # analyze_change_monthly()
+
+    file_spy = "prices/weekly/SPY.csv"
+    file_spxl = "prices/weekly/SPXL.csv"
+    file_tqqq = "prices/weekly/TQQQ.csv"
+
+    condor_call1 = Spread(206.19, 207.5, 3.2, 227.5, 0.20)
+    condor_put1 = Spread(206.19, 205, 3.2, 187.5, 0.25)
+
+    backtest_condor("prices/weekly/FAS.csv", condor_put1, condor_call1, 2)
 
 
 main()
